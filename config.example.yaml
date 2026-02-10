@@ -1,0 +1,36 @@
+# Home Assistant WebSocket Entity Filter Proxy
+#
+# This proxy sits between your browser/tablet and Home Assistant,
+# intercepting subscribe_entities WebSocket messages to add entity_ids
+# filtering. This dramatically reduces the amount of state change data
+# sent to the client.
+
+# Required: URL of your Home Assistant instance
+homeassistant_url: "http://homeassistant.local:8123"
+
+# Required: Long-lived access token
+# Create one at: http://homeassistant.local:8123/profile → Long-Lived Access Tokens
+access_token: "your-long-lived-access-token-here"
+
+# Optional: Address to listen on (default: ":8124")
+listen_addr: ":8124"
+
+# Optional: Dashboard URL path to extract entities from
+# Leave empty or omit for the default dashboard
+# For a custom dashboard at /my-dashboard/, set to "my-dashboard"
+dashboard_url_path: ""
+
+# Optional: Transparent mode (default: false)
+# When true, strips X-Forwarded-* proxy headers so HA sees requests as
+# direct client connections. Use this if you don't want to configure
+# trusted_proxies in HA. When false, HA sees standard proxy headers and
+# you must add this proxy's IP to HA's http.trusted_proxies.
+transparent: true
+
+# Optional: Additional entity IDs to include beyond what's auto-detected
+# from the dashboard config. Use this for entities referenced in templates,
+# custom cards, or conditional logic that can't be detected statically.
+extra_entities: []
+#  - sensor.cpu_temperature
+#  - weather.home
+#  - binary_sensor.front_door
