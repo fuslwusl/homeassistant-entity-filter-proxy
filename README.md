@@ -38,7 +38,7 @@ At runtime, for each WebSocket connection on `/api/websocket`:
 ### Home Assistant Add-on (UI Configurable)
 
 This repository now includes a Home Assistant add-on definition at
-`addon/homeassistant-entity-filter-proxy`.
+`homeassistant-entity-filter-proxy`.
 
 To use it in Home Assistant:
 
