@@ -66,7 +66,7 @@ go build -o ha-ws-proxy
 Copy the example config and edit it:
 
 ```sh
-cp config.example.yaml config.yaml
+cp config.example.yaml config.local.yaml
 ```
 
 ```yaml
@@ -92,7 +92,7 @@ exclude_entity_globs:         # remove entities matching these globs
 ### Run
 
 ```sh
-./ha-ws-proxy -config config.yaml
+./ha-ws-proxy -config config.local.yaml
 ```
 
 Point your tablet browser to `http://<proxy-host>:8124` instead of directly to HA.

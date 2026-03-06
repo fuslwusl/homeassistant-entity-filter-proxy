@@ -1,0 +1,43 @@
+name: Home Assistant Entity Filter Proxy
+version: "0.1.0"
+slug: homeassistant-entity-filter-proxy
+description: Reverse proxy for Home Assistant with entity filtering and state update throttling.
+url: "https://github.com/fuslwusl/homeassistant-entity-filter-proxy"
+startup: services
+boot: auto
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+ports:
+  8124/tcp: 8124
+ports_description:
+  8124/tcp: Proxy HTTP endpoint for tablet/browser clients
+options:
+  homeassistant_url: "http://homeassistant:8123"
+  access_token: "replace-me"
+  listen_addr: ":8124"
+  dashboard_url_path: ""
+  include_all_entities: false
+  state_update_interval: "3s"
+  transparent: true
+  extra_entities: []
+  include_entity_globs: []
+  exclude_entity_globs: []
+schema:
+  homeassistant_url: str
+  access_token: password?
+  listen_addr: str
+  dashboard_url_path: str?
+  include_all_entities: bool
+  state_update_interval: str?
+  transparent: bool
+  extra_entities:
+    - str
+  include_entity_globs:
+    - str
+  exclude_entity_globs:
+    - str

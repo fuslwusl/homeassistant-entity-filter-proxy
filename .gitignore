@@ -1,2 +1,3 @@
-config.yaml
+/config.yaml
+/config.local.yaml
 ha-ws-proxy
