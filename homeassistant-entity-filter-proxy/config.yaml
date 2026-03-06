@@ -1,5 +1,5 @@
 name: Home Assistant Entity Filter Proxy
-version: "0.1.0"
+version: "0.1.1"
 slug: homeassistant-entity-filter-proxy
 description: Reverse proxy for Home Assistant with entity filtering and state update throttling.
 url: "https://github.com/fuslwusl/homeassistant-entity-filter-proxy"
