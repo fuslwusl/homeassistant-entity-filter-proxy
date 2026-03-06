@@ -1,6 +1,6 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25.5-alpine AS builder
 WORKDIR /src
 
 COPY src/go.mod src/go.sum ./
