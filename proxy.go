@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -39,6 +40,10 @@ func newEntityFilter(entityIDs []string) *entityFilter {
 // and filters state_changed events to only include allowed entities.
 // If false, all messages pass through unmodified (used for non-/api/websocket WS paths).
 func wsProxy(haWSURL string, entityIDs []string, filterEntities bool, w http.ResponseWriter, r *http.Request) {
+	wsProxyWithInterval(haWSURL, entityIDs, filterEntities, 0, w, r)
+}
+
+func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool, stateUpdateEvery time.Duration, w http.ResponseWriter, r *http.Request) {
 	clientConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("client websocket upgrade failed: %v", err)
@@ -53,17 +58,56 @@ func wsProxy(haWSURL string, entityIDs []string, filterEntities bool, w http.Res
 		return
 	}
 
-	log.Printf("websocket proxy session: %s (filter=%v)", r.URL.Path, filterEntities)
+	log.Printf("websocket proxy session: %s (filter=%v, state_update_interval=%s)", r.URL.Path, filterEntities, stateUpdateEvery)
 
 	var filter *entityFilter
 	if filterEntities {
 		filter = newEntityFilter(entityIDs)
 	}
 
+	var throttler *stateUpdateThrottler
+	if stateUpdateEvery > 0 {
+		throttler = newStateUpdateThrottler(stateUpdateEvery)
+	}
+
 	var closeOnce sync.Once
+	done := make(chan struct{})
+	var clientWriteMu sync.Mutex
+	writeToClient := func(msgType int, payload []byte) error {
+		clientWriteMu.Lock()
+		defer clientWriteMu.Unlock()
+		return clientConn.WriteMessage(msgType, payload)
+	}
+
 	cleanup := func() {
+		close(done)
 		clientConn.Close()
 		haConn.Close()
+	}
+
+	if throttler != nil {
+		go func() {
+			ticker := time.NewTicker(throttler.interval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					payload := throttler.flushPayload()
+					if payload == nil {
+						continue
+					}
+					if err := writeToClient(websocket.TextMessage, payload); err != nil {
+						if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+							log.Printf("state update flush write error: %v", err)
+						}
+						return
+					}
+				}
+			}
+		}()
 	}
 
 	// HA → Client: filter state_changed events for non-allowed entities
@@ -85,7 +129,14 @@ func wsProxy(haWSURL string, entityIDs []string, filterEntities bool, w http.Res
 				}
 			}
 
-			if err := clientConn.WriteMessage(msgType, data); err != nil {
+			if throttler != nil && msgType == websocket.TextMessage {
+				data = throttler.processFrame(data)
+				if data == nil {
+					continue // state_changed updates buffered for interval flush
+				}
+			}
+
+			if err := writeToClient(msgType, data); err != nil {
 				log.Printf("ha→client write error: %v", err)
 				return
 			}

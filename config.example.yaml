@@ -20,6 +20,17 @@ listen_addr: ":8124"
 # For a custom dashboard at /my-dashboard/, set to "my-dashboard"
 dashboard_url_path: ""
 
+# Optional: Include all entities (default: false)
+# When true, disables entity extraction and filtering entirely.
+# /api/websocket traffic is proxied unchanged.
+# This overrides extra_entities and glob filters.
+include_all_entities: false
+
+# Optional: Send state_changed updates in batches at this interval.
+# Example values: "1s", "5s", "500ms". Empty means real-time updates.
+# Keeps only the latest pending update per entity per interval.
+state_update_interval: 1s
+
 # Optional: Transparent mode (default: false)
 # When true, strips X-Forwarded-* proxy headers so HA sees requests as
 # direct client connections. Use this if you don't want to configure
@@ -30,7 +41,22 @@ transparent: true
 # Optional: Additional entity IDs to include beyond what's auto-detected
 # from the dashboard config. Use this for entities referenced in templates,
 # custom cards, or conditional logic that can't be detected statically.
-extra_entities: []
+# Ignored when include_all_entities is true.
+#extra_entities:
 #  - sensor.cpu_temperature
 #  - weather.home
 #  - binary_sensor.front_door
+
+# Optional: Keep only entities that match one of these glob patterns.
+# If empty, all extracted + extra entities are considered.
+# Ignored when include_all_entities is true.
+#include_entity_globs:
+#  - light.*
+#  - sensor.*_temperature
+
+# Optional: Remove entities that match one of these glob patterns.
+# Excludes are applied after includes.
+# Ignored when include_all_entities is true.
+#exclude_entity_globs:
+#  - sensor.*_battery
+#  - binary_sensor.*_tamper

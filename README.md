@@ -62,10 +62,16 @@ access_token: "your-long-lived-access-token-here"
 # Optional
 listen_addr: ":8124"          # default :8124
 dashboard_url_path: ""        # "" = default dashboard, "my-dashboard" for a named one
+include_all_entities: false    # true = disable entity filtering and pass all entities through
+state_update_interval: "2s"   # optional: batch state_changed updates every 2s
 transparent: true             # strip proxy headers (see below)
 extra_entities:               # entities to include beyond auto-detected ones
   - sensor.cpu_temperature
   - weather.home
+include_entity_globs:         # keep only entities matching these globs
+  - light.*
+exclude_entity_globs:         # remove entities matching these globs
+  - sensor.*_battery
 ```
 
 ### Run
@@ -97,6 +103,22 @@ The proxy walks the Lovelace dashboard config and extracts entity IDs from:
 This mirrors the frontend's own `computeUsedEntities()` logic.
 
 Entities referenced in templates, custom cards with dynamic entity access, or conditional logic may not be detected. Use `extra_entities` in the config to include these manually.
+
+You can additionally constrain the final list with glob filters:
+
+- `include_entity_globs`: If set, only entities matching at least one pattern are kept.
+- `exclude_entity_globs`: Entities matching any pattern are removed.
+- Filter order is include first, then exclude.
+
+Glob syntax uses Go's `path.Match` rules (`*`, `?`, and character classes like `[ab]`).
+
+If you want to bypass filtering and include everything, set `include_all_entities: true`.
+In that mode, the proxy skips dashboard entity extraction and forwards `/api/websocket` traffic unchanged.
+`extra_entities`, `include_entity_globs`, and `exclude_entity_globs` are ignored.
+
+You can also throttle entity updates with `state_update_interval` (Go duration format, e.g. `500ms`, `2s`, `10s`).
+When set, `state_changed` events are buffered and flushed once per interval.
+For each entity, only the latest pending update in that interval is sent.
 
 **Note**: Strategy-based dashboards cannot be statically analyzed. The proxy will exit with an error if it detects a strategy config. Use a non-strategy dashboard or specify all entities via `extra_entities`.
 

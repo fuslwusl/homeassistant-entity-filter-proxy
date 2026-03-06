@@ -20,41 +20,55 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// Bootstrap: fetch Lovelace config and extract entity IDs
-	log.Printf("fetching lovelace config from %s ...", cfg.HomeAssistantURL)
-	lovelaceConfig, err := fetchLovelaceConfig(cfg.HomeAssistantURL, cfg.AccessToken, cfg.DashboardURLPath)
-	if err != nil {
-		log.Fatalf("failed to fetch lovelace config: %v", err)
-	}
+	shouldFilterEntities := !cfg.IncludeAllEntities
+	var entityIDs []string
 
-	// Check for strategy dashboard
-	if _, hasStrategy := lovelaceConfig["strategy"]; hasStrategy {
-		log.Fatalf("dashboard uses a strategy config -- entity IDs cannot be extracted statically. " +
-			"Use extra_entities in config to specify entities manually, or use a non-strategy dashboard.")
-	}
+	if shouldFilterEntities {
+		// Bootstrap: fetch Lovelace config and extract entity IDs
+		log.Printf("fetching lovelace config from %s ...", cfg.HomeAssistantURL)
+		lovelaceConfig, err := fetchLovelaceConfig(cfg.HomeAssistantURL, cfg.AccessToken, cfg.DashboardURLPath)
+		if err != nil {
+			log.Fatalf("failed to fetch lovelace config: %v", err)
+		}
 
-	entityIDs := extractEntities(lovelaceConfig)
+		// Check for strategy dashboard
+		if _, hasStrategy := lovelaceConfig["strategy"]; hasStrategy {
+			log.Fatalf("dashboard uses a strategy config -- entity IDs cannot be extracted statically. " +
+				"Use extra_entities in config to specify entities manually, or use a non-strategy dashboard.")
+		}
 
-	// Merge extra entities from config
-	seen := make(map[string]struct{}, len(entityIDs))
-	for _, id := range entityIDs {
-		seen[id] = struct{}{}
-	}
-	for _, id := range cfg.ExtraEntities {
-		if _, exists := seen[id]; !exists {
-			entityIDs = append(entityIDs, id)
+		entityIDs = extractEntities(lovelaceConfig)
+
+		// Merge extra entities from config
+		seen := make(map[string]struct{}, len(entityIDs))
+		for _, id := range entityIDs {
 			seen[id] = struct{}{}
 		}
-	}
+		for _, id := range cfg.ExtraEntities {
+			if _, exists := seen[id]; !exists {
+				entityIDs = append(entityIDs, id)
+				seen[id] = struct{}{}
+			}
+		}
 
-	if len(entityIDs) == 0 {
-		log.Fatalf("no entity IDs found in dashboard config and no extra_entities configured")
-	}
+		beforeGlobFilter := len(entityIDs)
+		entityIDs = filterEntityIDsByGlob(entityIDs, cfg.IncludeEntityGlobs, cfg.ExcludeEntityGlobs)
+		if len(cfg.IncludeEntityGlobs) > 0 || len(cfg.ExcludeEntityGlobs) > 0 {
+			log.Printf("applied entity glob filters: include=%d exclude=%d (%d -> %d entities)",
+				len(cfg.IncludeEntityGlobs), len(cfg.ExcludeEntityGlobs), beforeGlobFilter, len(entityIDs))
+		}
 
-	sort.Strings(entityIDs)
-	log.Printf("will filter subscribe_entities to %d entities:", len(entityIDs))
-	for _, id := range entityIDs {
-		log.Printf("  %s", id)
+		if len(entityIDs) == 0 {
+			log.Fatalf("no entity IDs left after applying dashboard extraction, extra_entities, and glob filters")
+		}
+
+		sort.Strings(entityIDs)
+		log.Printf("will filter subscribe_entities to %d entities:", len(entityIDs))
+		for _, id := range entityIDs {
+			log.Printf("  %s", id)
+		}
+	} else {
+		log.Printf("include_all_entities enabled: disabling entity subscription/event filtering")
 	}
 
 	// Set up the reverse proxy target
@@ -99,8 +113,12 @@ func main() {
 		log.Printf("request: %s %s (ws_upgrade=%v)", r.Method, r.URL.Path, isWebSocketUpgrade(r))
 		if isWebSocketUpgrade(r) {
 			// Proxy the WebSocket, injecting entity filter on /api/websocket
-			filterEntities := r.URL.Path == "/api/websocket"
-			wsProxy(haWSURL, entityIDs, filterEntities, w, r)
+			filterEntities := shouldFilterEntities && r.URL.Path == "/api/websocket"
+			stateUpdateEvery := cfg.StateUpdateEvery
+			if r.URL.Path != "/api/websocket" {
+				stateUpdateEvery = 0
+			}
+			wsProxyWithInterval(haWSURL, entityIDs, filterEntities, stateUpdateEvery, w, r)
 			return
 		}
 		reverseProxy.ServeHTTP(w, r)
