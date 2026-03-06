@@ -35,6 +35,21 @@ At runtime, for each WebSocket connection on `/api/websocket`:
 
 ## Setup
 
+### Home Assistant Add-on (UI Configurable)
+
+This repository now includes a Home Assistant add-on definition at
+`addon/homeassistant-entity-filter-proxy`.
+
+To use it in Home Assistant:
+
+1. Go to **Settings -> Add-ons -> Add-on Store -> Repositories**.
+2. Add this repository URL as a custom add-on repository.
+3. Install **Home Assistant Entity Filter Proxy**.
+4. Configure options in the add-on UI (URL, token, throttle interval, entity filters).
+5. Start the add-on and point clients to `http://<ha-host>:8124`.
+
+Add-on metadata file for repository registration is `repository.yaml`.
+
 ### Prerequisites
 
 - Go 1.21+
