@@ -38,7 +38,7 @@ func (t *stateUpdateThrottler) processFrame(data []byte) []byte {
 
 		immediate := make([]json.RawMessage, 0, len(messages))
 		for _, msg := range messages {
-			if !t.bufferIfStateChanged(msg) {
+			if !t.bufferIfThrottled(msg) {
 				immediate = append(immediate, msg)
 			}
 		}
@@ -57,16 +57,16 @@ func (t *stateUpdateThrottler) processFrame(data []byte) []byte {
 		return payload
 	}
 
-	if t.bufferIfStateChanged(data) {
+	if t.bufferIfThrottled(data) {
 		return nil
 	}
 
 	return data
 }
 
-func (t *stateUpdateThrottler) bufferIfStateChanged(raw []byte) bool {
+func (t *stateUpdateThrottler) bufferIfThrottled(raw []byte) bool {
 	isStateChanged, entityID := parseStateChangedEntityID(raw)
-	if !isStateChanged {
+	if !isStateChanged && !isSubscribeEntitiesEvent(raw) {
 		return false
 	}
 
@@ -139,4 +139,35 @@ func parseStateChangedEntityID(raw []byte) (bool, string) {
 	}
 
 	return true, msg.Event.Data.EntityID
+}
+
+func isSubscribeEntitiesEvent(raw []byte) bool {
+	var msg struct {
+		Type  string          `json:"type"`
+		Event json.RawMessage `json:"event"`
+	}
+
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return false
+	}
+	if msg.Type != "event" || len(msg.Event) == 0 {
+		return false
+	}
+
+	var event map[string]json.RawMessage
+	if err := json.Unmarshal(msg.Event, &event); err != nil {
+		return false
+	}
+
+	if _, hasAdded := event["a"]; hasAdded {
+		return true
+	}
+	if _, hasChanged := event["c"]; hasChanged {
+		return true
+	}
+	if _, hasRemoved := event["r"]; hasRemoved {
+		return true
+	}
+
+	return false
 }
