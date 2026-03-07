@@ -10,7 +10,7 @@ if [ ! -f "$OPTIONS_FILE" ]; then
 fi
 
 HOMEASSISTANT_URL=$(jq -ec '.homeassistant_url' "$OPTIONS_FILE")
-ACCESS_TOKEN=$(jq -ec '.access_token' "$OPTIONS_FILE")
+ACCESS_TOKEN=$(jq -ec '.access_token // ""' "$OPTIONS_FILE")
 LISTEN_ADDR=$(jq -ec '.listen_addr // ":8124"' "$OPTIONS_FILE")
 DASHBOARD_URL_PATH=$(jq -ec '.dashboard_url_path // ""' "$OPTIONS_FILE")
 INCLUDE_ALL_ENTITIES=$(jq -er '.include_all_entities // false' "$OPTIONS_FILE")

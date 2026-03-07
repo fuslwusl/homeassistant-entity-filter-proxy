@@ -18,10 +18,10 @@ ports_description:
   8124/tcp: Proxy HTTP endpoint for tablet/browser clients
 options:
   homeassistant_url: "http://homeassistant:8123"
-  access_token: "replace-me"
+  access_token: ""
   listen_addr: ":8124"
   dashboard_url_path: ""
-  include_all_entities: false
+  include_all_entities: true
   state_update_interval: "3s"
   transparent: true
   extra_entities: []

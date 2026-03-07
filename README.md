@@ -70,7 +70,7 @@ cp config.example.yaml config.local.yaml
 ```
 
 ```yaml
-# Required
+# Required (or optional in pass-through mode, see below)
 homeassistant_url: "http://homeassistant.local:8123"
 access_token: "your-long-lived-access-token-here"
 
@@ -130,6 +130,7 @@ Glob syntax uses Go's `path.Match` rules (`*`, `?`, and character classes like `
 If you want to bypass filtering and include everything, set `include_all_entities: true`.
 In that mode, the proxy skips dashboard entity extraction and forwards `/api/websocket` traffic unchanged.
 `extra_entities`, `include_entity_globs`, and `exclude_entity_globs` are ignored.
+In this mode, `access_token` is optional because no Lovelace bootstrap request is performed.
 
 You can also throttle entity updates with `state_update_interval` (Go duration format, e.g. `500ms`, `2s`, `10s`).
 When set, `state_changed` events are buffered and flushed once per interval.

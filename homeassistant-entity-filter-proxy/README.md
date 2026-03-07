@@ -14,7 +14,7 @@ This add-on packages the `ha-ws-proxy` application so it can be configured from 
 All settings are available in the add-on UI:
 
 - `homeassistant_url`: URL of your HA instance (for add-on network use `http://homeassistant:8123`)
-- `access_token`: Long-lived access token
+- `access_token`: Long-lived access token (required only when `include_all_entities` is `false`)
 - `listen_addr`: Bind address for proxy (default `:8124`)
 - `dashboard_url_path`: Dashboard path, empty for default
 - `include_all_entities`: Disable filtering if set to `true`

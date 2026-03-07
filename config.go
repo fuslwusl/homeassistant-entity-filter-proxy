@@ -39,8 +39,8 @@ func loadConfig(path string) (*Config, error) {
 	if cfg.HomeAssistantURL == "" {
 		return nil, fmt.Errorf("homeassistant_url is required")
 	}
-	if cfg.AccessToken == "" {
-		return nil, fmt.Errorf("access_token is required")
+	if !cfg.IncludeAllEntities && cfg.AccessToken == "" {
+		return nil, fmt.Errorf("access_token is required when include_all_entities is false")
 	}
 
 	if !cfg.IncludeAllEntities {
