@@ -15,6 +15,15 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+// Client connection liveness: a write that blocks longer than clientWriteWait,
+// or no pong within clientPongWait, ends the session so that dead or stalled
+// clients (sleeping tablets, dropped WiFi) don't keep buffers alive forever.
+const (
+	clientWriteWait    = 10 * time.Second
+	clientPongWait     = 60 * time.Second
+	clientPingInterval = 25 * time.Second
+)
+
 // entityFilter tracks state_changed subscription IDs and provides filtering
 // for both client→HA and HA→client directions.
 type entityFilter struct {
@@ -90,6 +99,7 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 	writeToClient := func(msgType int, payload []byte) error {
 		clientWriteMu.Lock()
 		defer clientWriteMu.Unlock()
+		clientConn.SetWriteDeadline(time.Now().Add(clientWriteWait))
 		return clientConn.WriteMessage(msgType, payload)
 	}
 
@@ -99,8 +109,32 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 		haConn.Close()
 	}
 
+	clientConn.SetReadDeadline(time.Now().Add(clientPongWait))
+	clientConn.SetPongHandler(func(string) error {
+		return clientConn.SetReadDeadline(time.Now().Add(clientPongWait))
+	})
+
+	go func() {
+		defer closeOnce.Do(cleanup)
+		ticker := time.NewTicker(clientPingInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := clientConn.WriteControl(websocket.PingMessage, nil, time.Now().Add(clientWriteWait)); err != nil {
+					log.Printf("client ping failed, closing session: %v", err)
+					return
+				}
+			}
+		}
+	}()
+
 	if throttler != nil {
 		go func() {
+			defer closeOnce.Do(cleanup)
 			ticker := time.NewTicker(throttler.interval)
 			defer ticker.Stop()
 
@@ -152,6 +186,10 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 
 			if throttler != nil && msgType == websocket.TextMessage {
 				data = throttler.processFrame(data)
+				if throttler.overflowed() {
+					log.Printf("client %s is not keeping up with state updates (>%d bytes buffered), closing session", r.RemoteAddr, maxPendingBytes)
+					return
+				}
 				if data == nil {
 					continue // state_changed updates buffered for interval flush
 				}

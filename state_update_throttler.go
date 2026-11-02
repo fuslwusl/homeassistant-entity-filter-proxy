@@ -8,11 +8,18 @@ import (
 	"time"
 )
 
+// maxPendingBytes caps the memory buffered between two flushes. If a client
+// can't keep up (flush blocked on a slow/dead connection), the buffer would
+// otherwise grow without bound because buffering removes the backpressure
+// HA would normally see.
+const maxPendingBytes = 8 << 20
+
 type stateUpdateThrottler struct {
 	interval        time.Duration
 	mu              sync.Mutex
 	pendingByEntity map[string]json.RawMessage
 	pendingOther    []json.RawMessage
+	pendingBytes    int
 }
 
 func newStateUpdateThrottler(interval time.Duration) *stateUpdateThrottler {
@@ -78,11 +85,20 @@ func (t *stateUpdateThrottler) bufferIfThrottled(raw []byte) bool {
 
 	if entityID == "" {
 		t.pendingOther = append(t.pendingOther, msg)
+		t.pendingBytes += len(msg)
 		return true
 	}
 
+	t.pendingBytes += len(msg) - len(t.pendingByEntity[entityID])
 	t.pendingByEntity[entityID] = msg
 	return true
+}
+
+// overflowed reports whether the buffered updates exceed maxPendingBytes.
+func (t *stateUpdateThrottler) overflowed() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.pendingBytes > maxPendingBytes
 }
 
 func (t *stateUpdateThrottler) flushPayload() []byte {
@@ -107,6 +123,7 @@ func (t *stateUpdateThrottler) flushPayload() []byte {
 
 	t.pendingByEntity = make(map[string]json.RawMessage)
 	t.pendingOther = nil
+	t.pendingBytes = 0
 
 	if len(batch) == 1 {
 		return []byte(batch[0])
