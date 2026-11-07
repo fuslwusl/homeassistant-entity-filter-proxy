@@ -170,10 +170,16 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 				return
 			}
 
-			if msgType == websocket.TextMessage {
-				var peek map[string]any
-				if json.Unmarshal(data, &peek) == nil && peek["type"] == "auth_invalid" {
-					log.Printf("auth_invalid from HA for client %s: %v", r.RemoteAddr, peek["message"])
+			// Cheap substring check first: fully decoding every frame just to
+			// spot auth_invalid costs ~12x the frame size in heap and caused
+			// OOM kills on large frames (e.g. history streams).
+			if msgType == websocket.TextMessage && bytes.Contains(data, []byte(`"auth_invalid"`)) {
+				var peek struct {
+					Type    string `json:"type"`
+					Message string `json:"message"`
+				}
+				if json.Unmarshal(data, &peek) == nil && peek.Type == "auth_invalid" {
+					log.Printf("auth_invalid from HA for client %s: %s", r.RemoteAddr, peek.Message)
 				}
 			}
 

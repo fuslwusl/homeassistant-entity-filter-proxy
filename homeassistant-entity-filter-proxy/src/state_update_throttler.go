@@ -37,6 +37,12 @@ func (t *stateUpdateThrottler) processFrame(data []byte) []byte {
 		return data
 	}
 
+	// Only "event" messages can be throttled. Skip everything else (e.g.
+	// large get_states results) without decoding it.
+	if !bytes.Contains(trimmed, []byte(`"event"`)) {
+		return data
+	}
+
 	if trimmed[0] == '[' {
 		var messages []json.RawMessage
 		if err := json.Unmarshal(data, &messages); err != nil {
@@ -72,13 +78,15 @@ func (t *stateUpdateThrottler) processFrame(data []byte) []byte {
 }
 
 func (t *stateUpdateThrottler) bufferIfThrottled(raw []byte) bool {
-	isStateChanged, entityID := parseStateChangedEntityID(raw)
-	if !isStateChanged && !isSubscribeEntitiesEvent(raw) {
+	throttle, entityID := classifyEvent(raw)
+	if !throttle {
 		return false
 	}
 
-	msgCopy := append([]byte(nil), raw...)
-	msg := json.RawMessage(msgCopy)
+	// No copy needed: raw is either a frame freshly allocated by
+	// ReadMessage or an element decoded from a coalesced array, and the
+	// caller does not reuse it once it has been buffered.
+	msg := json.RawMessage(raw)
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -137,7 +145,19 @@ func (t *stateUpdateThrottler) flushPayload() []byte {
 	return payload
 }
 
-func parseStateChangedEntityID(raw []byte) (bool, string) {
+// presence records that a JSON field exists without allocating a copy of
+// its (possibly large) value.
+type presence bool
+
+func (p *presence) UnmarshalJSON([]byte) error {
+	*p = true
+	return nil
+}
+
+// classifyEvent decodes a single message once and reports whether it is a
+// throttleable event: a state_changed event (entityID set when present) or a
+// subscribe_entities update (keys "a", "c" or "r"; entityID empty).
+func classifyEvent(raw []byte) (throttle bool, entityID string) {
 	var msg struct {
 		Type  string `json:"type"`
 		Event struct {
@@ -145,46 +165,20 @@ func parseStateChangedEntityID(raw []byte) (bool, string) {
 			Data      struct {
 				EntityID string `json:"entity_id"`
 			} `json:"data"`
+			Added   presence `json:"a"`
+			Changed presence `json:"c"`
+			Removed presence `json:"r"`
 		} `json:"event"`
 	}
 
-	if err := json.Unmarshal(raw, &msg); err != nil {
+	if err := json.Unmarshal(raw, &msg); err != nil || msg.Type != "event" {
 		return false, ""
 	}
-	if msg.Type != "event" || msg.Event.EventType != "state_changed" {
-		return false, ""
+	if msg.Event.EventType == "state_changed" {
+		return true, msg.Event.Data.EntityID
 	}
-
-	return true, msg.Event.Data.EntityID
-}
-
-func isSubscribeEntitiesEvent(raw []byte) bool {
-	var msg struct {
-		Type  string          `json:"type"`
-		Event json.RawMessage `json:"event"`
+	if msg.Event.Added || msg.Event.Changed || msg.Event.Removed {
+		return true, ""
 	}
-
-	if err := json.Unmarshal(raw, &msg); err != nil {
-		return false
-	}
-	if msg.Type != "event" || len(msg.Event) == 0 {
-		return false
-	}
-
-	var event map[string]json.RawMessage
-	if err := json.Unmarshal(msg.Event, &event); err != nil {
-		return false
-	}
-
-	if _, hasAdded := event["a"]; hasAdded {
-		return true
-	}
-	if _, hasChanged := event["c"]; hasChanged {
-		return true
-	}
-	if _, hasRemoved := event["r"]; hasRemoved {
-		return true
-	}
-
-	return false
+	return false, ""
 }

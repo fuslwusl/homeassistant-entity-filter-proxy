@@ -7,13 +7,25 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"runtime/debug"
 	"sort"
 	"strings"
 )
 
+// defaultMemoryLimit is a soft heap limit that makes the GC collect more
+// aggressively before the process grows large enough to be OOM-killed on
+// small hosts (e.g. a Raspberry Pi running Home Assistant). It can be
+// overridden with the standard GOMEMLIMIT environment variable.
+const defaultMemoryLimit = 256 << 20
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
+
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(defaultMemoryLimit)
+	}
 
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
