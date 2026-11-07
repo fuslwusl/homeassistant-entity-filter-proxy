@@ -87,6 +87,7 @@ include_entity_globs:         # keep only entities matching these globs
   - light.*
 exclude_entity_globs:         # remove entities matching these globs
   - sensor.*_battery
+large_frame_log_bytes: 1048576 # log HA responses >= 1 MiB with the causing request (0 = off)
 ```
 
 ### Run

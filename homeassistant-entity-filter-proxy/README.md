@@ -23,6 +23,7 @@ All settings are available in the add-on UI:
 - `extra_entities`: Extra entity IDs to include
 - `include_entity_globs`: Include filter globs
 - `exclude_entity_globs`: Exclude filter globs
+- `large_frame_log_bytes`: Log HA responses (WebSocket frames and HTTP bodies) of at least this many bytes together with the request that caused them, plus traffic totals per WebSocket session (default `1048576`, `0` disables)
 
 ## Usage
 

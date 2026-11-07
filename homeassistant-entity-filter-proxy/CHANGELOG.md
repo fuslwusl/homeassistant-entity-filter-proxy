@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.7
+
+### Added
+
+- Diagnostics for large responses (option `large_frame_log_bytes`, default 1 MiB, `0` disables):
+  - HA→client WebSocket frames above the threshold are logged with their size, message id/type and the client request that caused them.
+  - HTTP responses above the threshold are logged with method, path and query (credential-like parameters masked).
+  - Every WebSocket session logs its duration and the frames/bytes received from HA when it ends.
+  - `auth` messages are never recorded, so access tokens do not end up in the log.
+
 ## 0.1.6
 
 ### Fixed

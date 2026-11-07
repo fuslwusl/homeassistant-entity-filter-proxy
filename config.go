@@ -21,6 +21,7 @@ type Config struct {
 	IncludeEntityGlobs  []string      `yaml:"include_entity_globs"`
 	ExcludeEntityGlobs  []string      `yaml:"exclude_entity_globs"`
 	Transparent         bool          `yaml:"transparent"`
+	LargeFrameLogBytes  int           `yaml:"large_frame_log_bytes"`
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -30,7 +31,8 @@ func loadConfig(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		ListenAddr: ":8124",
+		ListenAddr:         ":8124",
+		LargeFrameLogBytes: 1 << 20,
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
@@ -50,6 +52,10 @@ func loadConfig(path string) (*Config, error) {
 		if err := validateGlobPatterns("exclude_entity_globs", cfg.ExcludeEntityGlobs); err != nil {
 			return nil, err
 		}
+	}
+
+	if cfg.LargeFrameLogBytes < 0 {
+		return nil, fmt.Errorf("large_frame_log_bytes must be >= 0")
 	}
 
 	if cfg.StateUpdateInterval != "" {

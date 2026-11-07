@@ -32,6 +32,11 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	largeFrameLogBytes = cfg.LargeFrameLogBytes
+	if largeFrameLogBytes > 0 {
+		log.Printf("logging HA responses >= %d bytes with the request that caused them", largeFrameLogBytes)
+	}
+
 	shouldFilterEntities := !cfg.IncludeAllEntities
 	var entityIDs []string
 
@@ -109,6 +114,7 @@ func main() {
 		reverseProxy.Transport = &transparentTransport{base: http.DefaultTransport}
 	}
 	reverseProxy.ModifyResponse = func(resp *http.Response) error {
+		wrapLargeResponseLogging(resp)
 		if resp.StatusCode >= 400 {
 			log.Printf("upstream returned %d for %s %s", resp.StatusCode, resp.Request.Method, resp.Request.URL)
 		}

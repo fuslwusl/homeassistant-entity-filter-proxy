@@ -19,6 +19,7 @@ TRANSPARENT=$(jq -er '.transparent // true' "$OPTIONS_FILE")
 EXTRA_ENTITIES=$(jq -ec '.extra_entities // []' "$OPTIONS_FILE")
 INCLUDE_ENTITY_GLOBS=$(jq -ec '.include_entity_globs // []' "$OPTIONS_FILE")
 EXCLUDE_ENTITY_GLOBS=$(jq -ec '.exclude_entity_globs // []' "$OPTIONS_FILE")
+LARGE_FRAME_LOG_BYTES=$(jq -er '.large_frame_log_bytes // 1048576' "$OPTIONS_FILE")
 
 {
   echo "homeassistant_url: ${HOMEASSISTANT_URL}"
@@ -31,6 +32,7 @@ EXCLUDE_ENTITY_GLOBS=$(jq -ec '.exclude_entity_globs // []' "$OPTIONS_FILE")
   echo "extra_entities: ${EXTRA_ENTITIES}"
   echo "include_entity_globs: ${INCLUDE_ENTITY_GLOBS}"
   echo "exclude_entity_globs: ${EXCLUDE_ENTITY_GLOBS}"
+  echo "large_frame_log_bytes: ${LARGE_FRAME_LOG_BYTES}"
 } > "$APP_CONFIG_FILE"
 
 echo "[info] Starting ha-ws-proxy"

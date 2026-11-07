@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -103,10 +104,19 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 		return clientConn.WriteMessage(msgType, payload)
 	}
 
+	// Per-session diagnostics: attribute large HA frames to the client
+	// request that caused them and log traffic totals when the session ends.
+	tracker := newRequestTracker()
+	sessionStart := time.Now()
+	var haFrames, haBytes atomic.Int64
+
 	cleanup := func() {
 		close(done)
 		clientConn.Close()
 		haConn.Close()
+		log.Printf("websocket session closed: %s client %s, duration %s, %d frames / %.1f MB from HA",
+			r.URL.Path, r.RemoteAddr, time.Since(sessionStart).Round(time.Second),
+			haFrames.Load(), float64(haBytes.Load())/(1<<20))
 	}
 
 	clientConn.SetReadDeadline(time.Now().Add(clientPongWait))
@@ -170,6 +180,12 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 				return
 			}
 
+			haFrames.Add(1)
+			haBytes.Add(int64(len(data)))
+			if largeFrameLogBytes > 0 && len(data) >= largeFrameLogBytes {
+				logLargeFrame(tracker, r.RemoteAddr, data)
+			}
+
 			// Cheap substring check first: fully decoding every frame just to
 			// spot auth_invalid costs ~12x the frame size in heap and caused
 			// OOM kills on large frames (e.g. history streams).
@@ -218,6 +234,10 @@ func wsProxyWithInterval(haWSURL string, entityIDs []string, filterEntities bool
 					log.Printf("client→ha read error: %v", err)
 				}
 				return
+			}
+
+			if msgType == websocket.TextMessage {
+				tracker.track(data)
 			}
 
 			if filter != nil && msgType == websocket.TextMessage {

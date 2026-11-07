@@ -60,3 +60,10 @@ transparent: true
 #exclude_entity_globs:
 #  - sensor.*_battery
 #  - binary_sensor.*_tamper
+
+# Optional: Diagnostics. Log HA responses (WebSocket frames and HTTP bodies)
+# of at least this many bytes together with the client request that caused
+# them, plus traffic totals when a WebSocket session ends.
+# Auth messages and credential-like query parameters are never logged.
+# Default: 1048576 (1 MiB). 0 disables.
+#large_frame_log_bytes: 1048576
